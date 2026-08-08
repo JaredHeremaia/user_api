@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>User API Tester</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-light: #273449;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #6366f1;
+    --accent-hover: #4f46e5;
+    --danger: #ef4444;
+    --success: #22c55e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem 1rem;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+  .panel h2 { margin-top: 0; font-size: 1.05rem; }
+
+  label { display: block; font-size: 0.8rem; color: var(--muted); margin: 0.6rem 0 0.25rem; }
+  input {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel-light);
+    color: var(--text);
+    font-size: 0.9rem;
+  }
+  input:focus { outline: 2px solid var(--accent); }
+
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    padding: 0.55rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 0.9rem;
+    margin-right: 0.5rem;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary { background: var(--panel-light); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: #33415a; }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 0.3rem 0.6rem; margin: 0; font-size: 0.75rem; }
+  .btn-danger:hover { background: rgba(239,68,68,0.1); }
+  .btn-edit { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 0.3rem 0.6rem; margin: 0 0.4rem 0 0; font-size: 0.75rem; }
+  .btn-edit:hover { background: rgba(99,102,241,0.1); }
+
+  #status {
+    font-size: 0.8rem;
+    margin-top: 0.75rem;
+    min-height: 1.1rem;
+  }
+  .status-ok { color: var(--success); }
+  .status-err { color: var(--danger); }
+
+  ul#userList { list-style: none; padding: 0; margin: 1rem 0 0; }
+  .user-card {
+    background: var(--panel-light);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.7rem 0.9rem;
+    margin-bottom: 0.6rem;
+  }
+  .user-card .row1 { display: flex; justify-content: space-between; align-items: center; }
+  .user-card .name { font-weight: 600; }
+  .user-card .email { color: var(--muted); font-size: 0.8rem; }
+  .user-card .meta { color: var(--muted); font-size: 0.72rem; margin-top: 0.3rem; }
+  .user-card .actions { margin-top: 0.5rem; }
+
+  .empty { color: var(--muted); font-size: 0.85rem; padding: 1rem 0; text-align: center; }
+  .refresh-row { display: flex; justify-content: space-between; align-items: center; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>User API Tester</h1>
+  <p class="subtitle">Simple frontend for the Add / Get / Update Users API</p>
+
+  <div class="grid">
+    <!-- Create / Update form -->
+    <div class="panel">
+      <h2 id="formTitle">Add a user</h2>
+      <form id="userForm">
+        <input type="hidden" id="userId" />
+
+        <label for="name">Name</label>
+        <input type="text" id="name" placeholder="Jane Doe" required />
+
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="jane@example.com" required />
+
+        <label for="age">Age (optional)</label>
+        <input type="number" id="age" min="0" placeholder="30" />
+
+        <div>
+          <button type="submit" class="btn-primary" id="submitBtn">Add User</button>
+          <button type="button" class="btn-secondary" id="cancelEditBtn" style="display:none;">Cancel</button>
+        </div>
+        <div id="status"></div>
+      </form>
+    </div>
+
+    <!-- User list -->
+    <div class="panel">
+      <div class="refresh-row">
+        <h2>Users</h2>
+        <button type="button" class="btn-secondary" id="refreshBtn">Refresh</button>
+      </div>
+      <ul id="userList"></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = "/api/users";
+
+  const form = document.getElementById("userForm");
+  const userIdField = document.getElementById("userId");
+  const nameField = document.getElementById("name");
+  const emailField = document.getElementById("email");
+  const ageField = document.getElementById("age");
+  const submitBtn = document.getElementById("submitBtn");
+  const cancelEditBtn = document.getElementById("cancelEditBtn");
+  const formTitle = document.getElementById("formTitle");
+  const statusEl = document.getElementById("status");
+  const userList = document.getElementById("userList");
+  const refreshBtn = document.getElementById("refreshBtn");
+
+  function showStatus(message, isError) {
+    statusEl.textContent = message;
+    statusEl.className = isError ? "status-err" : "status-ok";
+    if (message) {
+      setTimeout(() => { statusEl.textContent = ""; }, 3500);
+    }
+  }
+
+  function resetForm() {
+    userIdField.value = "";
+    form.reset();
+    submitBtn.textContent = "Add User";
+    formTitle.textContent = "Add a user";
+    cancelEditBtn.style.display = "none";
+  }
+
+  function startEdit(user) {
+    userIdField.value = user.id;
+    nameField.value = user.name;
+    emailField.value = user.email;
+    ageField.value = user.age ?? "";
+    submitBtn.textContent = "Save Changes";
+    formTitle.textContent = "Update user";
+    cancelEditBtn.style.display = "inline-block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function loadUsers() {
+    userList.innerHTML = '<li class="empty">Loading...</li>';
+    try {
+      const res = await fetch(API_BASE);
+      const users = await res.json();
+      renderUsers(users);
+    } catch (err) {
+      userList.innerHTML = '<li class="empty">Failed to load users</li>';
+    }
+  }
+
+  function renderUsers(users) {
+    if (!users.length) {
+      userList.innerHTML = '<li class="empty">No users yet — add one!</li>';
+      return;
+    }
+    userList.innerHTML = "";
+    users.forEach((user) => {
+      const li = document.createElement("li");
+      li.className = "user-card";
+      li.innerHTML = `
+        <div class="row1">
+          <div>
+            <div class="name">${escapeHtml(user.name)}</div>
+            <div class="email">${escapeHtml(user.email)}${user.age !== undefined && user.age !== null ? " · Age " + user.age : ""}</div>
+          </div>
+        </div>
+        <div class="meta">ID: ${user.id}</div>
+        <div class="actions">
+          <button class="btn-edit" data-action="edit">Edit</button>
+          <button class="btn-danger" data-action="delete">Delete</button>
+        </div>
+      `;
+      li.querySelector('[data-action="edit"]').addEventListener("click", () => startEdit(user));
+      li.querySelector('[data-action="delete"]').addEventListener("click", () => deleteUser(user.id));
+      userList.appendChild(li);
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  async function deleteUser(id) {
+    if (!confirm("Delete this user?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/${id}`, { method: "DELETE" });
+      if (res.status === 204) {
+        showStatus("User deleted", false);
+        loadUsers();
+      } else {
+        const data = await res.json();
+        showStatus(data.error || "Failed to delete user", true);
+      }
+    } catch (err) {
+      showStatus("Network error", true);
+    }
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = userIdField.value;
+    const payload = {
+      name: nameField.value.trim(),
+      email: emailField.value.trim(),
+      age: ageField.value ? Number(ageField.value) : undefined,
+    };
+
+    const isEdit = !!id;
+    const url = isEdit ? `${API_BASE}/${id}` : API_BASE;
+    const method = isEdit ? "PUT" : "POST";
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showStatus(data.error || "Something went wrong", true);
+        return;
+      }
+
+      showStatus(isEdit ? "User updated" : "User added", false);
+      resetForm();
+      loadUsers();
+    } catch (err) {
+      showStatus("Network error - is the server running?", true);
+    }
+  });
+
+  cancelEditBtn.addEventListener("click", resetForm);
+  refreshBtn.addEventListener("click", loadUsers);
+
+  loadUsers();
+</script>
+</body>
+</html>

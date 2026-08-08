@@ -1,0 +1,21 @@
+# Optional: spin up a local Postgres for this project without installing it
+# system-wide. Run: docker compose up -d
+#
+# This automatically creates the `users` table on first startup via
+# schema.sql mounted into Postgres's init directory.
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: user_api
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+volumes:
+  pgdata:
